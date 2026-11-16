@@ -1,0 +1,14 @@
+[package]
+name = "protocol"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true, optional = true}
+serde_json = { workspace = true, optional = true}
+
+[features]
+default = []
+std = []
+serde = ["dep:serde", "std"]
+json = ["serde", "dep:serde_json"]

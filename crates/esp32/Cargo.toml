@@ -5,6 +5,10 @@ edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+embedded-svc = "0.29"
+esp-idf-svc = "0.53.0"
 log.workspace = true
-protocol.workspace = true
-serde_json.workspace = true
+protocol = { workspace = true, features = ["json"] }
+
+[build-dependencies]
+embuild = { version = "0.33.7", features = ["espidf"] }

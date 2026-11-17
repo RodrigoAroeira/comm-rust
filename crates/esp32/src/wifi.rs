@@ -14,8 +14,7 @@ pub fn start_ap(
     sys_loop: EspSystemEventLoop,
     nvs: EspDefaultNvsPartition,
 ) -> anyhow::Result<BlockingWifi<EspWifi<'static>>> {
-    let mut wifi =
-        BlockingWifi::wrap(EspWifi::new(modem, sys_loop.clone(), Some(nvs))?, sys_loop)?;
+    let mut wifi = BlockingWifi::wrap(EspWifi::new(modem, sys_loop.clone(), Some(nvs))?, sys_loop)?;
 
     wifi.set_configuration(&Configuration::AccessPoint(AccessPointConfiguration {
         ssid: SSID.try_into()?,

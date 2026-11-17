@@ -2,8 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use embedded_svc::http::Headers;
 use esp_idf_svc::hal::uart::UartDriver;
-use esp_idf_svc::http::server::{Configuration as ServerConfig, EspHttpServer};
 use esp_idf_svc::http::Method;
+use esp_idf_svc::http::server::{Configuration as ServerConfig, EspHttpServer};
 use esp_idf_svc::io::{Read, Write};
 use protocol::TestCommand;
 

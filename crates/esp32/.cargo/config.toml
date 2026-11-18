@@ -3,11 +3,11 @@ target = "xtensa-esp32s3-espidf"
 
 [target.xtensa-esp32s3-espidf]
 linker = "ldproxy"
-runner = "espflash flash --monitor --chip esp32s3"
+runner = "espflash flash --chip esp32s3"
 
 [target.xtensa-esp32-espidf]
 linker = "ldproxy"
-runner = "espflash flash --monitor --chip esp32"
+runner = "espflash flash --chip esp32"
 
 [unstable]
 build-std = ["std", "panic_abort"]

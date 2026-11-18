@@ -1,0 +1,6 @@
+{
+  "test_type": "leakage",
+  "cap_model": "C500F",
+  "test_mv": 2500,
+  "soak_sec": 60
+}

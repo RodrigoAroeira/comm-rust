@@ -1,0 +1,7 @@
+{
+  "test_type": "capacitance",
+  "cap_model": "B350F",
+  "charge_ma": 15,
+  "max_mv": 15,
+  "hold_sec": 12
+}

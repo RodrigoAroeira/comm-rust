@@ -1,0 +1,6 @@
+{
+  "test_type": "esr",
+  "cap_model": "A100F",
+  "pulse_ma": 10000,
+  "pulse_ms": 1425
+}

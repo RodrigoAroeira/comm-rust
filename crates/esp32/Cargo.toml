@@ -3,6 +3,12 @@ name = "esp32"
 version.workspace = true
 edition.workspace = true
 
+[features]
+# The ESP32-S3 can carry the JSON REPL on its native USB Serial/JTAG port.
+# Classic ESP32 has no such peripheral and always uses the UART console.
+default = ["native-usb"]
+native-usb = []
+
 [dependencies]
 anyhow.workspace = true
 embedded-svc = "0.29"
@@ -12,3 +18,7 @@ protocol = { workspace = true, features = ["json"] }
 
 [build-dependencies]
 embuild = { version = "0.33.7", features = ["espidf"] }
+
+# Chip cfgs are injected by esp-idf-sys, not declared by Cargo.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(esp32s3)'] }

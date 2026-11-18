@@ -20,12 +20,13 @@ endif
 
 PORT   ?= $(DEFAULT_PORT)
 ESP_IP ?= 192.168.4.1
+PYTHON ?= python3
 
 CRATE_DIR := crates/esp32
 BIN       := target/$(TARGET)/release/esp32
 CARGO     := cd $(CRATE_DIR) && cargo
 
-.PHONY: help build all run auto detect flash monitor size smoke test lint fmt fmt-check check clean distclean hil
+.PHONY: help build all run auto detect flash monitor size smoke serial hil test lint fmt fmt-check check clean distclean
 .DEFAULT_GOAL := help
 
 help: ## Show this help
@@ -55,7 +56,7 @@ run: build ## Flash and attach the serial monitor (Ctrl-C to exit)
 flash: build ## Flash without attaching the monitor
 	espflash flash --chip $(ESPFLASH_CHIP) --port $(PORT) $(BIN)
 
-monitor: ## Attach to the serial console (does not flash)
+monitor: ## Attach to the serial console (JSON REPL; does not flash)
 	espflash monitor --chip $(ESPFLASH_CHIP) --port $(PORT)
 
 size: build ## Binary size and partition headroom
@@ -68,6 +69,9 @@ smoke: ## One POST against a running gateway
 	  -X POST http://$(ESP_IP)/api/run-test \
 	  -H 'Content-Type: application/json' \
 	  -d '{"test_type":"esr","cap_model":"A100F","pulse_ma":10000,"pulse_ms":1425}'
+
+serial: ## HIL test for the serial JSON REPL (close espflash monitor first)
+	$(PYTHON) tests/test_serial.py --port $(PORT)
 
 hil: ## On-hardware suite (needs tests/run_all from the port)
 	@test -x tests/run_all || { echo "missing tests/run_all - HIL suite not ported yet"; exit 1; }

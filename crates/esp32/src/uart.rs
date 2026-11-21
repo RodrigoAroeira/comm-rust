@@ -36,7 +36,10 @@ pub fn forward(uart: &Mutex<UartDriver<'static>>, cmd: &TestCommand) -> bool {
         return false;
     }
 
-    if !matches!(uart.write(&cmd.encode()), Ok(8)) {
+    let Ok(packet) = cmd.encode() else {
+        return false;
+    };
+    if !matches!(uart.write(&packet), Ok(n) if n == packet.len()) {
         return false;
     }
 

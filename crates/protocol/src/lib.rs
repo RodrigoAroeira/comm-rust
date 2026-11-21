@@ -1,39 +1,26 @@
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 
+extern crate alloc;
+
+use alloc::vec::Vec;
+
+use serde::{Deserialize, Serialize};
+
 pub const ACK_BYTE: u8 = 0xA5;
-pub const PACKET_LEN: usize = 8;
-pub type Packet = [u8; PACKET_LEN];
 
-#[repr(u8)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub type Packet = Vec<u8>;
+pub type EncodeError = ciborium::ser::Error<core::convert::Infallible>;
+pub type DecodeError = ciborium::de::Error<ciborium_io::EndOfFile>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CapModel {
-    A100F = 0,
-    B350F = 1,
-    C500F = 2,
+    A100F,
+    B350F,
+    C500F,
 }
 
-impl CapModel {
-    pub const fn as_u8(self) -> u8 {
-        self as u8
-    }
-
-    pub const fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::A100F),
-            1 => Some(Self::B350F),
-            2 => Some(Self::C500F),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(tag = "test_type", rename_all = "snake_case")
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "test_type", rename_all = "snake_case")]
 pub enum TestCommand {
     Esr {
         cap_model: CapModel,
@@ -54,96 +41,17 @@ pub enum TestCommand {
 }
 
 impl TestCommand {
-    pub fn tag(&self) -> u8 {
-        match self {
-            Self::Esr { .. } => 1,
-            Self::Capacitance { .. } => 2,
-            Self::Leakage { .. } => 3,
-        }
+    pub fn encode(&self) -> Result<Packet, EncodeError> {
+        let mut bytes = Packet::new();
+        ciborium::into_writer(self, &mut bytes)?;
+        Ok(bytes)
     }
 
-    pub fn encode(&self) -> Packet {
-        let mut packet = Packet::default();
-        packet[0] = self.tag();
-
-        match self {
-            TestCommand::Esr {
-                cap_model,
-                pulse_ma,
-                pulse_ms,
-            } => {
-                packet[1] = cap_model.as_u8();
-                packet[2..4].copy_from_slice(&pulse_ma.to_le_bytes());
-                packet[4..6].copy_from_slice(&pulse_ms.to_le_bytes());
-            }
-            TestCommand::Capacitance {
-                cap_model,
-                charge_ma,
-                max_mv,
-                hold_sec,
-            } => {
-                packet[1] = cap_model.as_u8();
-                packet[2..4].copy_from_slice(&charge_ma.to_le_bytes());
-                packet[4..6].copy_from_slice(&max_mv.to_le_bytes());
-                packet[6..8].copy_from_slice(&hold_sec.to_le_bytes());
-            }
-            TestCommand::Leakage {
-                cap_model,
-                test_mv,
-                soak_sec,
-            } => {
-                packet[1] = cap_model.as_u8();
-                packet[2..4].copy_from_slice(&test_mv.to_le_bytes());
-                packet[4..6].copy_from_slice(&soak_sec.to_le_bytes());
-            }
-        }
-        packet
-    }
-
-    pub fn decode(bytes: Packet) -> Result<Self, DecodeError> {
-        let cap_model =
-            CapModel::from_u8(bytes[1]).ok_or(DecodeError::UnknownCapModel(bytes[1]))?;
-
-        let read_u16 = |offset: usize| u16::from_le_bytes([bytes[offset], bytes[offset + 1]]);
-
-        match bytes[0] {
-            1 => Ok(Self::Esr {
-                cap_model,
-                pulse_ma: read_u16(2),
-                pulse_ms: read_u16(4),
-            }),
-            2 => Ok(Self::Capacitance {
-                cap_model,
-                charge_ma: read_u16(2),
-                max_mv: read_u16(4),
-                hold_sec: read_u16(6),
-            }),
-            3 => Ok(Self::Leakage {
-                cap_model,
-                test_mv: read_u16(2),
-                soak_sec: read_u16(4),
-            }),
-            other => Err(DecodeError::UnknownTestType(other)),
-        }
+    pub fn decode(bytes: &[u8]) -> Result<Self, DecodeError> {
+        let mut scratch = [0; 64];
+        ciborium::from_reader_with_buffer(bytes, &mut scratch)
     }
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    UnknownTestType(u8),
-    UnknownCapModel(u8),
-}
-
-impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match *self {
-            Self::UnknownTestType(tag) => write!(f, "unknown test type tag: {tag}"),
-            Self::UnknownCapModel(model) => write!(f, "unknown cap model: {model}"),
-        }
-    }
-}
-
-impl core::error::Error for DecodeError {}
 
 #[cfg(feature = "json")]
 impl TestCommand {
@@ -200,135 +108,32 @@ mod tests {
         },
     ];
 
-    const ESR_BYTES: Packet = [1, 0, 0x10, 0x27, 0x91, 0x05, 0, 0];
-    const CAPACITANCE_BYTES: Packet = [2, 1, 0x0F, 0x00, 0x0F, 0x00, 0x0C, 0x00];
-    const LEAKAGE_BYTES: Packet = [3, 2, 0xC4, 0x09, 0x3C, 0x00, 0, 0];
-
-    const ENDIAN_ESR: TestCommand = TestCommand::Esr {
-        cap_model: CapModel::A100F,
-        pulse_ma: 0x1234,
-        pulse_ms: 0x5678,
-    };
-    const ENDIAN_PACKET: Packet = [1, 0, 0x34, 0x12, 0x78, 0x56, 0, 0];
-
-    const INVALID_TEST_TYPES: [u8; 3] = [0, 4, u8::MAX];
-    const INVALID_CAP_MODELS: [u8; 2] = [3, u8::MAX];
-
-    #[test]
-    fn packet_len_is_stable() {
-        assert_eq!(PACKET_LEN, 8);
-    }
-
-    #[test]
-    fn cap_model_maps_to_wire_bytes() {
-        assert_eq!(CapModel::A100F.as_u8(), 0);
-        assert_eq!(CapModel::B350F.as_u8(), 1);
-        assert_eq!(CapModel::C500F.as_u8(), 2);
-    }
-
-    #[test]
-    fn cap_model_round_trips() {
-        for model in [CapModel::A100F, CapModel::B350F, CapModel::C500F] {
-            assert_eq!(CapModel::from_u8(model.as_u8()), Some(model));
-        }
-    }
-
-    #[test]
-    fn cap_model_rejects_unknown_bytes() {
-        for model in INVALID_CAP_MODELS {
-            assert_eq!(CapModel::from_u8(model), None);
-        }
-    }
-
-    #[test]
-    fn tag_matches_variant() {
-        assert_eq!(ESR.tag(), 1);
-        assert_eq!(CAPACITANCE.tag(), 2);
-        assert_eq!(LEAKAGE.tag(), 3);
-    }
-
-    #[test]
-    fn encodes_golden_packets() {
-        assert_eq!(ESR.encode(), ESR_BYTES);
-        assert_eq!(CAPACITANCE.encode(), CAPACITANCE_BYTES);
-        assert_eq!(LEAKAGE.encode(), LEAKAGE_BYTES);
-    }
-
-    #[test]
-    fn encode_zeroes_unused_trailing_bytes() {
-        for command in [ESR, LEAKAGE] {
-            assert_eq!(command.encode()[6..], [0, 0]);
-        }
-    }
-
     #[test]
     fn round_trips_all_variants() {
         for command in ALL_COMMANDS {
-            assert_eq!(TestCommand::decode(command.encode()), Ok(command));
+            let bytes = command.encode().unwrap();
+            assert_eq!(TestCommand::decode(&bytes).unwrap(), command);
         }
     }
 
     #[test]
     fn round_trips_extreme_values() {
         for command in EXTREME_COMMANDS {
-            assert_eq!(TestCommand::decode(command.encode()), Ok(command));
+            let bytes = command.encode().unwrap();
+            assert_eq!(TestCommand::decode(&bytes).unwrap(), command);
         }
     }
 
     #[test]
-    fn decodes_little_endian() {
-        assert_eq!(TestCommand::decode(ENDIAN_PACKET), Ok(ENDIAN_ESR));
+    fn decode_rejects_corrupted_input() {
+        let mut bytes = ESR.encode().unwrap();
+        bytes[0] = 0xFF;
+        assert!(TestCommand::decode(&bytes).is_err());
     }
 
     #[test]
-    fn decode_rejects_unknown_test_type() {
-        for tag in INVALID_TEST_TYPES {
-            let mut bytes = ESR_BYTES;
-            bytes[0] = tag;
-            assert_eq!(
-                TestCommand::decode(bytes),
-                Err(DecodeError::UnknownTestType(tag))
-            );
-        }
-    }
-
-    #[test]
-    fn decode_rejects_unknown_cap_model() {
-        for model in INVALID_CAP_MODELS {
-            let mut bytes = ESR_BYTES;
-            bytes[1] = model;
-            assert_eq!(
-                TestCommand::decode(bytes),
-                Err(DecodeError::UnknownCapModel(model))
-            );
-        }
-    }
-
-    #[test]
-    fn decode_ignores_unused_trailing_bytes() {
-        for (command, mut bytes) in [(ESR, ESR_BYTES), (LEAKAGE, LEAKAGE_BYTES)] {
-            bytes[6] = 0xFF;
-            bytes[7] = 0xFF;
-            assert_eq!(TestCommand::decode(bytes), Ok(command));
-        }
-    }
-
-    #[test]
-    fn decode_error_display() {
-        assert_eq!(
-            DecodeError::UnknownTestType(9).to_string(),
-            "unknown test type tag: 9"
-        );
-        assert_eq!(
-            DecodeError::UnknownCapModel(9).to_string(),
-            "unknown cap model: 9"
-        );
-    }
-
-    #[test]
-    fn decode_error_implements_error() {
-        fn assert_error<E: core::error::Error>() {}
-        assert_error::<DecodeError>();
+    fn decode_rejects_empty_input() {
+        assert!(TestCommand::decode(&[]).is_err());
     }
 
     #[cfg(feature = "json")]

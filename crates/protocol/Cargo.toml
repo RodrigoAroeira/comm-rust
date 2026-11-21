@@ -4,11 +4,13 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-serde = { workspace = true, optional = true}
-serde_json = { workspace = true, optional = true}
+ciborium = { workspace = true }
+ciborium-io = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
 
 [features]
 default = []
-std = []
-serde = ["dep:serde", "std"]
+std = ["serde/std"]
+serde = ["std"]
 json = ["serde", "dep:serde_json"]

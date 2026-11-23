@@ -39,12 +39,6 @@ STATUS_RE = re.compile(r'\{\s*"status"\s*:\s*"([A-Z_]+)"\s*\}')
 BANNER = "Serial REPL ready"
 RULE_WIDTH = 78
 
-OBJECT_LABELS = {
-    "A100F": "MODEL_A_100F",
-    "B350F": "MODEL_B_350F",
-    "C500F": "MODEL_C_500F",
-}
-
 
 class Color:
     RESET = "\033[0m"
@@ -217,7 +211,7 @@ def load_cases(tests_dir: Path) -> list[Case]:
             continue
 
         model = obj.get("cap_model", "?")
-        pretty_label = f"{OBJECT_LABELS.get(model, model)} / {str(obj.get('test_type', '?')).upper()}"
+        pretty_label = f"{model} / {str(obj.get('test_type', '?')).upper()}"
         cases.append(
             Case(
                 name=path.stem,

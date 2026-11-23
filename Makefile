@@ -26,13 +26,17 @@ CRATE_DIR := crates/esp32
 BIN       := target/$(TARGET)/release/esp32
 CARGO     := cd $(CRATE_DIR) && cargo
 
-.PHONY: help build all run auto detect flash monitor size smoke serial hil test lint fmt fmt-check check clean distclean
+.PHONY: help prepare build all run auto detect flash monitor size smoke serial hil test lint fmt fmt-check check clean distclean
 .DEFAULT_GOAL := help
 
 help: ## Show this help
 	@awk 'BEGIN { FS = ":.*##"; printf "\nUsage:\n  make <target> [CHIP=s3|esp32] [PORT=/dev/ttyXXX]\n\nTargets:\n" } \
 	  /^[a-z0-9-]+:.*##/ { printf "  %-12s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 	@printf "\n  CHIP default: s3 (%s)\n  PORT default: %s\n  ESP_IP: %s\n\n" "$(TARGET)" "$(PORT)" "$(ESP_IP)"
+
+prepare: ## Prepare environment for development
+	espup install -f export-esp.sh -t esp32,esp32s3
+	@echo "\nYou may need to source export-esp.sh"
 
 build: ## Build firmware (always release: debug is ~3.7 MB and will not fit)
 	$(CARGO) build --release --target $(TARGET)
